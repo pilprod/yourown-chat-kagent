@@ -143,6 +143,7 @@ func TestStockTestbedValuesStayClosed(t *testing.T) {
 		"default: ollama",
 		"host: http://model-fixture.kagent-testbed.svc.cluster.local:11434",
 		"type: ClusterIP",
+		"startupProbe:\n    httpGet:\n      path: /health\n      port: http\n    initialDelaySeconds: 10\n    periodSeconds: 5\n    failureThreshold: 20",
 		"substrateWorkerPool:\n  create: false",
 		"oauth2-proxy:\n",
 	} {

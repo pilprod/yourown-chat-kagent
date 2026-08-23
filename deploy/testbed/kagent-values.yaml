@@ -55,6 +55,15 @@ ui:
   replicas: 1
   image:
     tag: "0.9.12@sha256:1d5ada8d7f65a6b9ad28232463f9fd670c4c20875baa1c8008aaa1f1f988382e"
+  # The stock chart allows only three one-second startup attempts. On the
+  # constrained testbed node, supervisord can need longer to bring nginx up.
+  startupProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 20
   service:
     type: ClusterIP
     ports:

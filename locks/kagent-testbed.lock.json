@@ -1,7 +1,7 @@
 {
   "schemaVersion": "yourown-chat/kagent-testbed-lock/v1alpha2",
   "channel": "testbed",
-  "candidateTag": "testbed-20260823-1",
+  "candidateTag": "testbed-20260823-2",
   "productionEligible": false,
   "source": {
     "repository": "https://github.com/kagent-dev/kagent",
@@ -43,7 +43,7 @@
     }
   },
   "profile": {
-    "applicationValuesSHA256": "c9986976eea83ae60288ae12f44fa315f7ba1b61b5b9d7bfe88dd1b5e80ea518",
+    "applicationValuesSHA256": "b5f09da13023cf3ff9d1a89025802539d5292ac5f93a194e10fed5d98a691807",
     "crdValuesSHA256": "753d6253816b5701b653c42311811a2f2399b61e7ae14ad338491c03eb4729cf",
     "databaseMode": "external-cloudsql",
     "agentRuntime": "python-only",
