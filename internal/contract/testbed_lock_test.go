@@ -33,9 +33,16 @@ type testbedLock struct {
 			ArchiveSHA256 string `json:"archiveSHA256"`
 		} `json:"crds"`
 	} `json:"charts"`
+	Images map[string]struct {
+		Repository string `json:"repository"`
+		Tag        string `json:"tag"`
+		OCIDigest  string `json:"ociDigest"`
+	} `json:"images"`
 	Profile struct {
 		ApplicationValuesSHA256 string `json:"applicationValuesSHA256"`
 		CRDValuesSHA256         string `json:"crdValuesSHA256"`
+		DatabaseMode            string `json:"databaseMode"`
+		AgentRuntime            string `json:"agentRuntime"`
 		Namespace               string `json:"namespace"`
 		WorkloadNamespace       string `json:"workloadNamespace"`
 		UIHostname              string `json:"uiHostname"`
@@ -63,7 +70,7 @@ func TestStockTestbedReleaseLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if lock.SchemaVersion != "yourown-chat/kagent-testbed-lock/v1alpha1" || lock.Channel != "testbed" {
+	if lock.SchemaVersion != "yourown-chat/kagent-testbed-lock/v1alpha2" || lock.Channel != "testbed" {
 		t.Fatalf("unexpected testbed lock identity: %q %q", lock.SchemaVersion, lock.Channel)
 	}
 	if lock.ProductionEligible {
@@ -93,12 +100,20 @@ func TestStockTestbedReleaseLock(t *testing.T) {
 			t.Fatalf("invalid archive digest %q", value)
 		}
 	}
+	for _, name := range []string{"controller", "ui", "agent", "skillsInit"} {
+		image, ok := lock.Images[name]
+		if !ok || image.Repository == "" || image.Tag == "" || !digest.MatchString(image.OCIDigest) {
+			t.Fatalf("invalid immutable image lock %q", name)
+		}
+	}
 
 	assertFileSHA256(t, filepath.Join(root, "deploy", "testbed", "kagent-values.yaml"), lock.Profile.ApplicationValuesSHA256)
 	assertFileSHA256(t, filepath.Join(root, "deploy", "testbed", "kagent-crds-values.yaml"), lock.Profile.CRDValuesSHA256)
 
 	if lock.Profile.Namespace != "kagent-system" ||
 		lock.Profile.WorkloadNamespace != "kagent-testbed" ||
+		lock.Profile.DatabaseMode != "external-cloudsql" ||
+		lock.Profile.AgentRuntime != "python-only" ||
 		lock.Profile.UIHostname != "kagent.yourown.chat" ||
 		lock.Profile.UIService != "http://kagent-ui.kagent-system.svc.cluster.local:8080" {
 		t.Fatal("testbed route or namespace identity drifted")
@@ -118,8 +133,13 @@ func TestStockTestbedValuesStayClosed(t *testing.T) {
 	}
 	values := string(contents)
 	for _, required := range []string{
-		"tag: \"0.9.12\"",
+		"tag: \"\"",
+		"0.9.12@sha256:d1ea7b70bb8d97de9f0774d44b598971c944b3ab4e88294b0bb78e59d1a63c15",
+		"0.9.12@sha256:1d5ada8d7f65a6b9ad28232463f9fd670c4c20875baa1c8008aaa1f1f988382e",
 		"mode: unsecure",
+		"urlFile: /var/run/secrets/kagent-database/database-url",
+		"bundled:\n      enabled: false",
+		"driver: secrets-store-gke.csi.k8s.io",
 		"default: ollama",
 		"host: http://model-fixture.kagent-testbed.svc.cluster.local:11434",
 		"type: ClusterIP",
@@ -129,6 +149,9 @@ func TestStockTestbedValuesStayClosed(t *testing.T) {
 		if !strings.Contains(values, required) {
 			t.Fatalf("required closed-profile value missing: %q", required)
 		}
+	}
+	if strings.Contains(values, "bundled:\n      enabled: true") {
+		t.Fatal("testbed profile must not run PostgreSQL inside Kubernetes")
 	}
 	if regexp.MustCompile(`(?m)^\s*apiKey:\s*\S+`).MatchString(values) {
 		t.Fatal("model-provider API key must not be present in the testbed profile")
