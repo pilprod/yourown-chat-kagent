@@ -4,7 +4,9 @@ fullnameOverride: kagent
 namespaceOverride: kagent-system
 
 registry: cr.kagent.dev
-tag: "0.9.12"
+# Keep the global tag empty so each independently built image can be pinned to
+# its own immutable OCI manifest digest below.
+tag: ""
 imagePullPolicy: IfNotPresent
 
 labels:
@@ -19,6 +21,26 @@ rbac:
 controller:
   replicas: 1
   loglevel: info
+  image:
+    tag: "0.9.12@sha256:d1ea7b70bb8d97de9f0774d44b598971c944b3ab4e88294b0bb78e59d1a63c15"
+  # M0 qualifies only the Python agent runtime. The chart derives a different
+  # repository for Go agents while reusing this tag, so Go remains disabled
+  # until kagent publishes and we lock a matching Go runtime image.
+  agentImage:
+    tag: "0.9.12@sha256:5ee30b4584e8de3266eb3cc11f5c46e8627716339d04d14166c50bda5f0f4182"
+  skillsInitImage:
+    tag: "0.9.12@sha256:a1152800fbee8b9143877dcebb981b8a3b450c2c0c3904c8c61e8aa7ce87852a"
+  volumes:
+    - name: database-url
+      csi:
+        driver: secrets-store-gke.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: kagent-database-gcp
+  volumeMounts:
+    - name: database-url
+      mountPath: /var/run/secrets/kagent-database
+      readOnly: true
   watchNamespaces:
     - kagent-system
     - kagent-testbed
@@ -31,6 +53,8 @@ controller:
 
 ui:
   replicas: 1
+  image:
+    tag: "0.9.12@sha256:1d5ada8d7f65a6b9ad28232463f9fd670c4c20875baa1c8008aaa1f1f988382e"
   service:
     type: ClusterIP
     ports:
@@ -39,11 +63,12 @@ ui:
 
 database:
   postgres:
+    # The platform creates a dedicated database/user in the existing protected
+    # Cloud SQL instance. The ready-to-use URI is mounted from Secret Manager.
+    urlFile: /var/run/secrets/kagent-database/database-url
     vectorEnabled: false
     bundled:
-      # Development-only compatibility database; never promote this profile.
-      enabled: true
-      storage: 1Gi
+      enabled: false
 
 providers:
   # M0 must start without a model-provider secret. System E2E supplies a

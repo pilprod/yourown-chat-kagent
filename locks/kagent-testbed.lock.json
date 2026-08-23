@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "yourown-chat/kagent-testbed-lock/v1alpha1",
+  "schemaVersion": "yourown-chat/kagent-testbed-lock/v1alpha2",
   "channel": "testbed",
   "candidateTag": "testbed-20260823-1",
   "productionEligible": false,
@@ -20,9 +20,33 @@
       "archiveSHA256": "977e59c4ad7f751f2badea53d5f698220f37a1af28fb282fd7917103a084e7f3"
     }
   },
+  "images": {
+    "controller": {
+      "repository": "cr.kagent.dev/kagent-dev/kagent/controller",
+      "tag": "0.9.12",
+      "ociDigest": "sha256:d1ea7b70bb8d97de9f0774d44b598971c944b3ab4e88294b0bb78e59d1a63c15"
+    },
+    "ui": {
+      "repository": "cr.kagent.dev/kagent-dev/kagent/ui",
+      "tag": "0.9.12",
+      "ociDigest": "sha256:1d5ada8d7f65a6b9ad28232463f9fd670c4c20875baa1c8008aaa1f1f988382e"
+    },
+    "agent": {
+      "repository": "cr.kagent.dev/kagent-dev/kagent/app",
+      "tag": "0.9.12",
+      "ociDigest": "sha256:5ee30b4584e8de3266eb3cc11f5c46e8627716339d04d14166c50bda5f0f4182"
+    },
+    "skillsInit": {
+      "repository": "cr.kagent.dev/kagent-dev/kagent/skills-init",
+      "tag": "0.9.12",
+      "ociDigest": "sha256:a1152800fbee8b9143877dcebb981b8a3b450c2c0c3904c8c61e8aa7ce87852a"
+    }
+  },
   "profile": {
-    "applicationValuesSHA256": "de2e5f3fc6e6bdc7f1f93eb2a6453213ff800187071267514606f6bdd595fce2",
+    "applicationValuesSHA256": "c9986976eea83ae60288ae12f44fa315f7ba1b61b5b9d7bfe88dd1b5e80ea518",
     "crdValuesSHA256": "753d6253816b5701b653c42311811a2f2399b61e7ae14ad338491c03eb4729cf",
+    "databaseMode": "external-cloudsql",
+    "agentRuntime": "python-only",
     "namespace": "kagent-system",
     "workloadNamespace": "kagent-testbed",
     "uiHostname": "kagent.yourown.chat",
