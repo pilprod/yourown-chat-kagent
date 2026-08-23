@@ -1,0 +1,109 @@
+# Product-owned values for the stock, single-user M0 testbed. The public
+# platform adapter mirrors this closed profile and verifies its release digest.
+fullnameOverride: kagent
+namespaceOverride: kagent-system
+
+registry: cr.kagent.dev
+tag: "0.9.12"
+imagePullPolicy: IfNotPresent
+
+labels:
+  app.kubernetes.io/part-of: k8s-agents-platform
+  platform.yourown.chat/release-channel: testbed
+
+rbac:
+  namespaces:
+    - kagent-system
+    - kagent-testbed
+
+controller:
+  replicas: 1
+  loglevel: info
+  watchNamespaces:
+    - kagent-system
+    - kagent-testbed
+  # v0.9.12 is not a multi-user authorization boundary. Cloudflare Access and
+  # the platform NetworkPolicies isolate this explicitly single-user testbed.
+  auth:
+    mode: unsecure
+  substrate:
+    enabled: false
+
+ui:
+  replicas: 1
+  service:
+    type: ClusterIP
+    ports:
+      port: 8080
+      targetPort: 8080
+
+database:
+  postgres:
+    vectorEnabled: false
+    bundled:
+      # Development-only compatibility database; never promote this profile.
+      enabled: true
+      storage: 1Gi
+
+providers:
+  # M0 must start without a model-provider secret. System E2E supplies a
+  # deterministic fixture at this private address; real providers are opt-in.
+  default: ollama
+  ollama:
+    provider: Ollama
+    model: fixture-model
+    config:
+      host: http://model-fixture.kagent-testbed.svc.cluster.local:11434
+
+kmcp:
+  enabled: false
+
+substrate:
+  enabled: false
+
+substrateWorkerPool:
+  create: false
+
+kagent-tools:
+  enabled: false
+
+grafana-mcp:
+  enabled: false
+
+querydoc:
+  enabled: false
+
+oauth2-proxy:
+  # Human authentication is provided by the existing Cloudflare Access edge.
+  # Do not deploy a second, independently configured identity proxy in M0.
+  enabled: false
+
+k8s-agent:
+  enabled: false
+
+kgateway-agent:
+  enabled: false
+
+istio-agent:
+  enabled: false
+
+promql-agent:
+  enabled: false
+
+observability-agent:
+  enabled: false
+
+argo-rollouts-agent:
+  enabled: false
+
+helm-agent:
+  enabled: false
+
+cilium-policy-agent:
+  enabled: false
+
+cilium-manager-agent:
+  enabled: false
+
+cilium-debug-agent:
+  enabled: false
