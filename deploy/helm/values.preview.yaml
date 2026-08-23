@@ -1,0 +1,102 @@
+# Controller-delta preview profile. Cloud Build assembles controller and UI
+# companion images from the same source commit, then Cloud Deploy freezes both
+# tags to reviewed registry digests. The UI has only an in-cluster ClusterIP;
+# Cloudflare Access/Tunnel and its network policy are Terraform-owned gates.
+fullnameOverride: kagent-preview
+namespaceOverride: kagent-system
+
+registry: europe-west3-docker.pkg.dev
+imagePullPolicy: IfNotPresent
+
+labels:
+  platform.yourown.chat/part-of: k8s-agents-platform
+  platform.yourown.chat/release-channel: preview
+
+rbac:
+  namespaces:
+    - kagent-system
+    - kagent-testbed
+
+controller:
+  replicas: 1
+  loglevel: info
+  watchNamespaces:
+    - kagent-system
+    - kagent-testbed
+  auth:
+    # Preview remains private and unqualified until signed authn/authz lands.
+    mode: unsecure
+  image:
+    registry: europe-west3-docker.pkg.dev
+    repository: yourown-chat/docker/kagent-controller
+    tag: git-c4dd89b8035716ed201fc48fdc1492cb098848a7
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+  metrics:
+    enabled: false
+  substrate:
+    enabled: true
+    ateApiEndpoint: dns:///api.ate-system.svc:443
+    atenetRouterURL: http://atenet-router.ate-system.svc:80
+    ateApiServer:
+      namespace: ate-system
+      serviceAccount: ate-api-server
+    defaultWorkerPool:
+      namespace: ate-system
+      name: kagent-default
+database:
+  postgres:
+    vectorEnabled: false
+    bundled:
+      # Disposable testbed database. The image is frozen to the reviewed OCI
+      # index; controller-only candidates cannot change the migration tree.
+      enabled: true
+      image:
+        registry: docker.io
+        repository: library
+        name: postgres
+        tag: 18.3-alpine@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
+        pullPolicy: IfNotPresent
+      storage: 1Gi
+
+ui:
+  replicas: 1
+  image:
+    registry: europe-west3-docker.pkg.dev
+    repository: yourown-chat/docker/kagent-ui
+    tag: git-c4dd89b8035716ed201fc48fdc1492cb098848a7
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    ports:
+      port: 8080
+      targetPort: 8080
+
+# Substrate is a separately qualified, pre-installed dependency. This chart
+# neither installs its CRDs nor creates a WorkerPool.
+substrate:
+  enabled: false
+substrateWorkerPool:
+  create: false
+
+kmcp:
+  enabled: false
+kagent-tools:
+  enabled: false
+grafana-mcp:
+  enabled: false
+querydoc:
+  enabled: false
+oauth2-proxy:
+  enabled: false
+
+providers:
+  # No external provider credential is a prerequisite for controller startup.
+  # System tests own this deterministic fixture endpoint.
+  default: ollama
+  ollama:
+    provider: Ollama
+    model: fixture-model
+    config:
+      host: http://model-fixture.kagent-testbed.svc.cluster.local:11434

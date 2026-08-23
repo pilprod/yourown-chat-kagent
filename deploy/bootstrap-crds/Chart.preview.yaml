@@ -1,0 +1,7 @@
+apiVersion: v2
+name: kagent-crds
+description: One-time platform-admin CRD bootstrap for the locked preview source
+type: application
+version: 0.0.0-preview
+appVersion: c4dd89b8035716ed201fc48fdc1492cb098848a7
+# kagent CRDs only; KMCP and Substrate have separate owners and lifecycles.

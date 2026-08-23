@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "k8s-agents-platform/kagent-preview-lock/v1alpha1",
+  "classification": "preview-controller-only",
+  "qualificationStatus": "assembly-unqualified",
+  "source": {
+    "forkRepository": "https://github.com/pilprod/kagent.git",
+    "upstreamRepository": "https://github.com/kagent-dev/kagent.git",
+    "commit": "c4dd89b8035716ed201fc48fdc1492cb098848a7",
+    "comparisonBaseCommit": "dc2d113ba5c61ed91bd8bfe6915722477ab99b60",
+    "applicationChartTree": "4d893acba3dd09733c6da02e1c605487b8473154",
+    "crdChartTree": "f0c29fb83c1c09a6b4eace2609a9cc8d0a2cc4fe"
+  },
+  "build": {
+    "goVersion": "1.27.0",
+    "platform": "linux/amd64",
+    "package": "core/cmd/controller-v2/main.go",
+    "dockerfile": "go/Dockerfile",
+    "imageRepository": "europe-west3-docker.pkg.dev/yourown-chat/docker/kagent-controller",
+    "imageTag": "git-c4dd89b8035716ed201fc48fdc1492cb098848a7",
+    "ui": {
+      "sourcePath": "ui",
+      "dockerfile": "ui/Dockerfile",
+      "imageRepository": "europe-west3-docker.pkg.dev/yourown-chat/docker/kagent-ui",
+      "imageTag": "git-c4dd89b8035716ed201fc48fdc1492cb098848a7"
+    }
+  },
+  "tooling": {
+    "goBuilderImage": "docker.io/library/golang:1.26.5-bookworm@sha256:53eeac89074db483fdf0ab3be1df32bf6e47562263d2d0d6baa7f26acb4957dd",
+    "goToolchain": "1.27.0",
+    "helmImage": "docker.io/alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9",
+    "trivyImage": "docker.io/aquasec/trivy:0.67.2@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08",
+    "buildkitImage": "docker.io/moby/buildkit:v0.23.0@sha256:a38cf64aa6415899097fac5bfcf6c07c95d5a68c67a21e3d254ba398a3c9187f"
+  },
+  "deployment": {
+    "skaffoldFile": "deploy/skaffold.preview.yaml",
+    "skaffoldProfile": "kagent-testbed",
+    "chartPath": "../source/kagent/helm/kagent",
+    "valuesPath": "deploy/helm/values.preview.yaml",
+    "valuesSHA256": "70021aa7f38e949babe3f77743f41d35dd9f685503e47a6eced07b6ce49eda28",
+    "namespace": "kagent-system",
+    "cloudDeployPipeline": "kagent-preview",
+    "cloudDeployTarget": "kagent-testbed",
+    "controllerServiceType": "ClusterIP",
+    "uiReplicas": 1,
+    "uiServiceType": "ClusterIP",
+    "uiOrigin": "http://kagent-preview-ui.kagent-system.svc.cluster.local:8080",
+    "bootstrapCRDs": {
+      "mode": "one-time-platform-admin",
+      "artifactPath": "evidence/bootstrap-crds.yaml",
+      "automaticApply": false,
+      "bundleSHA256": "b34b1165e642e5c621443550f8b212957f49ed9df77e36b87832ee7df51fe1f7"
+    },
+    "excludedTemplates": [
+      "templates/rbac",
+      "templates/substrate-ate-api-rbac.yaml"
+    ],
+    "verificationImage": "docker.io/curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b",
+    "database": {
+      "mode": "bundled-testbed",
+      "image": "docker.io/library/postgres:18.3-alpine@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7"
+    },
+    "substrate": {
+      "mode": "external",
+      "version": "0.0.20",
+      "namespace": "ate-system",
+      "workerPool": "kagent-default"
+    }
+  },
+  "evidence": {
+    "bucket": "yourown-chat-kagent-preview-europe-west3",
+    "prefix": "evidence/yourown-chat-kagent/preview"
+  },
+  "release": {
+    "owner": "pilprod/yourown-chat-kagent",
+    "triggerRepository": "pilprod/yourown-chat-kagent",
+    "triggerTagPattern": "^preview-[0-9]{8}-[1-9][0-9]*$",
+    "releaseNameTemplate": "kagent-{tag}-{sourceShortSHA}",
+    "forkTagsRelease": false,
+    "productionEligible": false
+  }
+}

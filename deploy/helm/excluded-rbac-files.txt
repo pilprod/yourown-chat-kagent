@@ -1,0 +1,10 @@
+templates/rbac/getter-role.yaml
+templates/rbac/getter-rolebinding.yaml
+templates/rbac/leader-election-role.yaml
+templates/rbac/leader-election-rolebinding.yaml
+templates/rbac/metrics-auth-clusterrole.yaml
+templates/rbac/metrics-auth-clusterrolebinding.yaml
+templates/rbac/metrics-reader-clusterrole.yaml
+templates/rbac/writer-role.yaml
+templates/rbac/writer-rolebinding.yaml
+templates/substrate-ate-api-rbac.yaml

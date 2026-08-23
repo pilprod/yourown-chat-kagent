@@ -1,0 +1,51 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: yourown-chat-kagent-preview
+
+# Cloud Build supplies this already-pushed artifact to Cloud Deploy with
+# --images. The custom command makes an accidental local/Skaffold rebuild fail.
+build:
+  artifacts:
+    - image: europe-west3-docker.pkg.dev/yourown-chat/docker/kagent-controller
+      custom:
+        buildCommand: |
+          echo "kagent preview artifacts must be built by cloudbuild.preview.yaml" >&2
+          exit 1
+    - image: europe-west3-docker.pkg.dev/yourown-chat/docker/kagent-ui
+      custom:
+        buildCommand: |
+          echo "kagent preview artifacts must be built by cloudbuild.preview.yaml" >&2
+          exit 1
+
+deploy:
+  kubectl: {}
+
+profiles:
+  - name: kagent-testbed
+    manifests:
+      helm:
+        releases:
+          - name: kagent-preview
+            chartPath: ../source/kagent/helm/kagent
+            namespace: kagent-system
+            createNamespace: false
+            valuesFiles:
+              - helm/values.preview.yaml
+    verify:
+      - name: kagent-controller-health
+        container:
+          name: verify
+          image: docker.io/curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b
+          command: ["/bin/sh", "-ceu"]
+          args:
+            - |
+              curl --fail --silent --show-error \
+                --retry 30 --retry-all-errors --retry-delay 5 \
+                http://kagent-preview-controller.kagent-system.svc.cluster.local:8083/health
+              curl --fail --silent --show-error \
+                --retry 30 --retry-all-errors --retry-delay 5 \
+                http://kagent-preview-ui.kagent-system.svc.cluster.local:8080/health
+        executionMode:
+          kubernetesCluster:
+            jobManifestPath: verify/job.yaml

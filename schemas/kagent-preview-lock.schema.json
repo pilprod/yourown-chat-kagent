@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pilprod/yourown-chat-kagent/schemas/kagent-preview-lock.schema.json",
+  "title": "kagent controller-delta preview lock with UI companion",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "classification",
+    "qualificationStatus",
+    "source",
+    "build",
+    "tooling",
+    "deployment",
+    "evidence",
+    "release"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "k8s-agents-platform/kagent-preview-lock/v1alpha1"
+    },
+    "classification": {
+      "const": "preview-controller-only"
+    },
+    "qualificationStatus": {
+      "enum": ["assembly-unqualified", "testbed-qualified"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forkRepository",
+        "upstreamRepository",
+        "commit",
+        "comparisonBaseCommit",
+        "applicationChartTree",
+        "crdChartTree"
+      ],
+      "properties": {
+        "forkRepository": {
+          "const": "https://github.com/pilprod/kagent.git"
+        },
+        "upstreamRepository": {
+          "const": "https://github.com/kagent-dev/kagent.git"
+        },
+        "commit": { "$ref": "#/$defs/gitObject" },
+        "comparisonBaseCommit": { "$ref": "#/$defs/gitObject" },
+        "applicationChartTree": { "$ref": "#/$defs/gitObject" },
+        "crdChartTree": { "$ref": "#/$defs/gitObject" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goVersion",
+        "platform",
+        "package",
+        "dockerfile",
+        "imageRepository",
+        "imageTag",
+        "ui"
+      ],
+      "properties": {
+        "goVersion": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$"
+        },
+        "platform": { "const": "linux/amd64" },
+        "package": { "const": "core/cmd/controller-v2/main.go" },
+        "dockerfile": { "const": "go/Dockerfile" },
+        "imageRepository": {
+          "const": "europe-west3-docker.pkg.dev/yourown-chat/docker/kagent-controller"
+        },
+        "imageTag": {
+          "type": "string",
+          "pattern": "^git-[0-9a-f]{40}$"
+        },
+        "ui": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourcePath", "dockerfile", "imageRepository", "imageTag"],
+          "properties": {
+            "sourcePath": { "const": "ui" },
+            "dockerfile": { "const": "ui/Dockerfile" },
+            "imageRepository": {
+              "const": "europe-west3-docker.pkg.dev/yourown-chat/docker/kagent-ui"
+            },
+            "imageTag": {
+              "type": "string",
+              "pattern": "^git-[0-9a-f]{40}$"
+            }
+          }
+        }
+      }
+    },
+    "tooling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goBuilderImage",
+        "goToolchain",
+        "helmImage",
+        "trivyImage",
+        "buildkitImage"
+      ],
+      "properties": {
+        "goBuilderImage": {
+          "const": "docker.io/library/golang:1.26.5-bookworm@sha256:53eeac89074db483fdf0ab3be1df32bf6e47562263d2d0d6baa7f26acb4957dd"
+        },
+        "goToolchain": { "const": "1.27.0" },
+        "helmImage": {
+          "const": "docker.io/alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9"
+        },
+        "trivyImage": {
+          "const": "docker.io/aquasec/trivy:0.67.2@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08"
+        },
+        "buildkitImage": {
+          "const": "docker.io/moby/buildkit:v0.23.0@sha256:a38cf64aa6415899097fac5bfcf6c07c95d5a68c67a21e3d254ba398a3c9187f"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skaffoldFile",
+        "skaffoldProfile",
+        "chartPath",
+        "valuesPath",
+        "valuesSHA256",
+        "namespace",
+        "cloudDeployPipeline",
+        "cloudDeployTarget",
+        "controllerServiceType",
+        "uiReplicas",
+        "uiServiceType",
+        "uiOrigin",
+        "bootstrapCRDs",
+        "excludedTemplates",
+        "verificationImage",
+        "database",
+        "substrate"
+      ],
+      "properties": {
+        "skaffoldFile": { "const": "deploy/skaffold.preview.yaml" },
+        "skaffoldProfile": { "const": "kagent-testbed" },
+        "chartPath": { "const": "../source/kagent/helm/kagent" },
+        "valuesPath": { "const": "deploy/helm/values.preview.yaml" },
+        "valuesSHA256": { "$ref": "#/$defs/sha256" },
+        "namespace": { "const": "kagent-system" },
+        "cloudDeployPipeline": { "const": "kagent-preview" },
+        "cloudDeployTarget": { "const": "kagent-testbed" },
+        "controllerServiceType": { "const": "ClusterIP" },
+        "uiReplicas": { "const": 1 },
+        "uiServiceType": { "const": "ClusterIP" },
+        "uiOrigin": {
+          "const": "http://kagent-preview-ui.kagent-system.svc.cluster.local:8080"
+        },
+        "bootstrapCRDs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "artifactPath", "automaticApply", "bundleSHA256"],
+          "properties": {
+            "mode": { "const": "one-time-platform-admin" },
+            "artifactPath": { "const": "evidence/bootstrap-crds.yaml" },
+            "automaticApply": { "const": false },
+            "bundleSHA256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "excludedTemplates": {
+          "const": [
+            "templates/rbac",
+            "templates/substrate-ate-api-rbac.yaml"
+          ]
+        },
+        "verificationImage": {
+          "const": "docker.io/curlimages/curl:8.10.1@sha256:d9b4541e214bcd85196d6e92e2753ac6d0ea699f0af5741f8c6cccbfcf00ef4b"
+        },
+        "database": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "image"],
+          "properties": {
+            "mode": { "const": "bundled-testbed" },
+            "image": {
+              "const": "docker.io/library/postgres:18.3-alpine@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7"
+            }
+          }
+        },
+        "substrate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "version", "namespace", "workerPool"],
+          "properties": {
+            "mode": { "const": "external" },
+            "version": { "const": "0.0.20" },
+            "namespace": { "const": "ate-system" },
+            "workerPool": { "const": "kagent-default" }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket", "prefix"],
+      "properties": {
+        "bucket": { "const": "yourown-chat-kagent-preview-europe-west3" },
+        "prefix": { "const": "evidence/yourown-chat-kagent/preview" }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "triggerRepository",
+        "triggerTagPattern",
+        "releaseNameTemplate",
+        "forkTagsRelease",
+        "productionEligible"
+      ],
+      "properties": {
+        "owner": { "const": "pilprod/yourown-chat-kagent" },
+        "triggerRepository": { "const": "pilprod/yourown-chat-kagent" },
+        "triggerTagPattern": {
+          "const": "^preview-[0-9]{8}-[1-9][0-9]*$"
+        },
+        "releaseNameTemplate": {
+          "const": "kagent-{tag}-{sourceShortSHA}"
+        },
+        "forkTagsRelease": { "const": false },
+        "productionEligible": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "gitObject": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -93,7 +93,10 @@ deny-by-default MCP в зафиксированной версии для упр
 composition, checkpoint/fork, Codex/Claude Harness, browser BFF/UI и миграцию
 legacy Session/SandboxAgent.
 
-Не утверждены release pipeline, production target, Helm wrapper, registry,
-набор публикуемых образов, долгоживущий AgentInstance на несколько AgentRun и
-лицензия интеграционного кода. Эти решения принимаются отдельно после
-conformance и проверки зависимостей.
+Для conformance утверждён только controller-only delta preview lane: exact fork
+commit, linux/amd64 controller и неизменённый UI companion, приватные ClusterIP,
+одна UI replica за отдельным Terraform-owned Cloudflare Access/Tunnel gate,
+отдельный one-time CRD bootstrap и внешний Substrate `0.0.20`. Он не является
+production target и не ослабляет перечисленные выше блокировки. Долгоживущий
+AgentInstance на несколько AgentRun и лицензия интеграционного кода остаются
+отдельными решениями.

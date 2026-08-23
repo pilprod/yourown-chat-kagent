@@ -1,0 +1,8 @@
+apiVersion: v2
+name: kagent
+description: Reviewed controller-delta kagent preview assembly with UI companion
+type: application
+version: 0.0.0-preview
+appVersion: c4dd89b8035716ed201fc48fdc1492cb098848a7
+# Intentionally no dependencies. The preview values consume an existing,
+# version-pinned Substrate installation and disable every optional subchart.

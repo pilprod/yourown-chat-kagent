@@ -1,0 +1,4 @@
+kmcp:
+  enabled: false
+substrate:
+  enabled: false

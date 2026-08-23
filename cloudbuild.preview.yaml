@@ -1,0 +1,535 @@
+# Trigger contract: pilprod/yourown-chat-kagent immutable tags matching
+# ^preview-[0-9]{8}-[1-9][0-9]*$. The fork source revision comes only from the
+# reviewed preview lock; COMMIT_SHA identifies this release assembly.
+timeout: 3600s
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+  substitutionOption: MUST_MATCH
+
+substitutions:
+  _PROJECT_ID: yourown-chat
+  _REGION: europe-west3
+  _ARTIFACT_REPOSITORY: docker
+  _DELIVERY_PIPELINE: kagent-preview
+  _INITIAL_TARGET: kagent-testbed
+  _PREVIEW_TAG_REGEX: ^preview-[0-9]{8}-[1-9][0-9]*$
+  _PREVIEW_LOCK: locks/kagent-preview.lock.json
+  _EVIDENCE_BUCKET: yourown-chat-kagent-preview-europe-west3
+  _CRDS_READY: "false"
+  _CRD_BUNDLE_SHA256: b34b1165e642e5c621443550f8b212957f49ed9df77e36b87832ee7df51fe1f7
+  _SUBSTRATE_READY: "false"
+  _SUBSTRATE_VERSION: 0.0.20
+  _GO_IMAGE: docker.io/library/golang:1.26.5-bookworm@sha256:53eeac89074db483fdf0ab3be1df32bf6e47562263d2d0d6baa7f26acb4957dd
+  _HELM_IMAGE: docker.io/alpine/helm:3.19.0@sha256:aef9b56f64e866207d9591d0abd8f6d767b36aadd12edf68f8a719716d9d29c9
+  _TRIVY_IMAGE: docker.io/aquasec/trivy:0.67.2@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08
+  _BUILDKIT_IMAGE: docker.io/moby/buildkit:v0.23.0@sha256:a38cf64aa6415899097fac5bfcf6c07c95d5a68c67a21e3d254ba398a3c9187f
+
+steps:
+  - id: validate-tag-and-lock
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    env:
+      - TAG_NAME=$TAG_NAME
+      - PRODUCT_COMMIT=$COMMIT_SHA
+      - BUILD_PROJECT=$PROJECT_ID
+    args:
+      - -ceu
+      - |
+        mkdir -p /workspace/evidence
+        python3 scripts/preview-lock-env.py "$_PREVIEW_LOCK" \
+          > /workspace/evidence/preview.env
+        # preview-lock-env.py emits shell-quoted values from a closed schema.
+        source /workspace/evidence/preview.env
+
+        test -n "$${TAG_NAME}" || {
+          echo "preview release requires an immutable tag trigger" >&2
+          exit 1
+        }
+        printf '%s\n' "$${TAG_NAME}" | grep -Eq "$_PREVIEW_TAG_REGEX" || {
+          echo "tag $${TAG_NAME} does not match $_PREVIEW_TAG_REGEX" >&2
+          exit 1
+        }
+        test "$${TRIGGER_TAG_PATTERN}" = "$_PREVIEW_TAG_REGEX" || {
+          echo "Terraform trigger regex differs from the reviewed lock" >&2
+          exit 1
+        }
+        printf '%s\n' "$${PRODUCT_COMMIT}" | grep -Eq '^[0-9a-f]{40}$' || {
+          echo "product COMMIT_SHA is not an immutable Git object" >&2
+          exit 1
+        }
+        test "$${BUILD_PROJECT}" = "$_PROJECT_ID" || {
+          echo "build project differs from release project" >&2
+          exit 1
+        }
+        test "$${IMAGE_REPOSITORY}" = "$_REGION-docker.pkg.dev/$_PROJECT_ID/$_ARTIFACT_REPOSITORY/kagent-controller" || {
+          echo "Artifact Registry substitutions differ from the reviewed lock" >&2
+          exit 1
+        }
+        test "$${UI_IMAGE_REPOSITORY}" = "$_REGION-docker.pkg.dev/$_PROJECT_ID/$_ARTIFACT_REPOSITORY/kagent-ui" || {
+          echo "UI Artifact Registry inputs differ from the reviewed lock" >&2
+          exit 1
+        }
+        test "$${CLOUD_DEPLOY_PIPELINE}" = "$_DELIVERY_PIPELINE" || {
+          echo "delivery pipeline substitution differs from the lock" >&2
+          exit 1
+        }
+        test "$${CLOUD_DEPLOY_TARGET}" = "$_INITIAL_TARGET" || {
+          echo "initial target substitution differs from the lock" >&2
+          exit 1
+        }
+        test "$${EVIDENCE_BUCKET}" = "$_EVIDENCE_BUCKET" || {
+          echo "evidence bucket substitution differs from the lock" >&2
+          exit 1
+        }
+        test "$${GO_BUILDER_IMAGE}" = "$_GO_IMAGE" || {
+          echo "Go builder image substitution differs from the reviewed lock" >&2
+          exit 1
+        }
+        test "$${HELM_IMAGE}" = "$_HELM_IMAGE" || {
+          echo "Helm image substitution differs from the reviewed lock" >&2
+          exit 1
+        }
+        test "$${TRIVY_IMAGE}" = "$_TRIVY_IMAGE" || {
+          echo "Trivy image substitution differs from the reviewed lock" >&2
+          exit 1
+        }
+        test "$${BUILDKIT_IMAGE}" = "$_BUILDKIT_IMAGE" || {
+          echo "BuildKit image substitution differs from the reviewed lock" >&2
+          exit 1
+        }
+        test "$_SUBSTRATE_VERSION" = "$${SUBSTRATE_VERSION}" || {
+          echo "platform Substrate version differs from the reviewed lock" >&2
+          exit 1
+        }
+        test "$_SUBSTRATE_READY" = "true" || {
+          echo "Substrate beta API, node rollout, and WorkerPool are not marked ready" >&2
+          exit 1
+        }
+        test "$_CRD_BUNDLE_SHA256" = "$${CRD_BUNDLE_SHA256}" || {
+          echo "platform CRD bundle digest differs from the reviewed lock" >&2
+          exit 1
+        }
+        test "$_CRDS_READY" = "true" || {
+          echo "current kagent CRDs are not marked ready by platform-admin" >&2
+          exit 1
+        }
+
+        source_short="$${SOURCE_COMMIT:0:8}"
+        release_name="kagent-$${TAG_NAME}-$${source_short}"
+        printf '%s\n' "$${release_name}" | grep -Eq '^[a-z][a-z0-9-]{0,62}$' || {
+          echo "derived Cloud Deploy release name is invalid" >&2
+          exit 1
+        }
+        {
+          printf 'PRODUCT_TAG=%q\n' "$${TAG_NAME}"
+          printf 'PRODUCT_COMMIT=%q\n' "$${PRODUCT_COMMIT}"
+          printf 'RELEASE_NAME=%q\n' "$${release_name}"
+        } >> /workspace/evidence/preview.env
+        cp "$_PREVIEW_LOCK" /workspace/evidence/kagent-preview.lock.json
+        python3 scripts/preview-lock-env.py "$_PREVIEW_LOCK" --format json \
+          > /workspace/evidence/locked-inputs.json
+
+  - id: test-release-contract
+    name: $_GO_IMAGE
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        go test ./...
+
+  - id: fetch-exact-fork-commit
+    name: gcr.io/cloud-builders/git
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        mkdir -p /workspace/source/kagent
+        git -C /workspace/source/kagent init
+        git -C /workspace/source/kagent remote add origin "$${SOURCE_REPOSITORY}"
+        git -C /workspace/source/kagent fetch --no-tags origin "$${SOURCE_COMMIT}"
+        if test "$${COMPARISON_BASE_COMMIT}" != "$${SOURCE_COMMIT}"; then
+          git -C /workspace/source/kagent fetch --no-tags origin "$${COMPARISON_BASE_COMMIT}"
+        fi
+        git -C /workspace/source/kagent checkout --detach "$${SOURCE_COMMIT}"
+        test "$$(git -C /workspace/source/kagent rev-parse HEAD)" = "$${SOURCE_COMMIT}"
+
+  - id: enforce-controller-only-delta
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        scripts/assert-controller-only.sh \
+          --source /workspace/source/kagent \
+          --lock "$_PREVIEW_LOCK" \
+          --assembly-root /workspace \
+          --write-env /workspace/evidence/preview.env.checked
+        cmp /workspace/evidence/preview.env.checked \
+          <(grep -vE '^(PRODUCT_TAG|PRODUCT_COMMIT|RELEASE_NAME)=' /workspace/evidence/preview.env)
+
+  - id: verify-go-controller
+    name: $_GO_IMAGE
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        export GOTOOLCHAIN="go$${GO_TOOLCHAIN}+auto"
+        test "$$(go env GOVERSION)" = "go$${GO_VERSION}"
+        cd /workspace/source/kagent/go
+        go version > /workspace/evidence/go-toolchain.txt
+        go test ./core/v2/... ./core/pkg/app
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+          go build -o /tmp/kagent-controller ./core/cmd/controller-v2
+        go version -m /tmp/kagent-controller \
+          > /workspace/evidence/controller-binary-buildinfo.txt
+
+  - id: assemble-and-render
+    name: $_HELM_IMAGE
+    entrypoint: sh
+    args:
+      - -ceu
+      - |
+        . /workspace/evidence/preview.env
+        mkdir -p /workspace/release-source/source/kagent/helm
+        mkdir -p /workspace/release-source/locks
+        cp -R /workspace/deploy /workspace/release-source/deploy
+        cp -R /workspace/source/kagent/helm/kagent \
+          /workspace/release-source/source/kagent/helm/kagent
+        test -d /workspace/release-source/source/kagent/helm/kagent/templates/rbac
+        test -f /workspace/release-source/source/kagent/helm/kagent/templates/substrate-ate-api-rbac.yaml
+        (
+          cd /workspace/release-source/source/kagent/helm/kagent
+          find templates/rbac -type f -print
+          printf '%s\n' templates/substrate-ate-api-rbac.yaml
+        ) | sort > /workspace/evidence/excluded-rbac-files.txt
+        cmp /workspace/deploy/helm/excluded-rbac-files.txt \
+          /workspace/evidence/excluded-rbac-files.txt || {
+          echo "upstream RBAC template set changed; Terraform ownership must be reviewed" >&2
+          exit 1
+        }
+        rm -rf /workspace/release-source/source/kagent/helm/kagent/templates/rbac
+        rm -f /workspace/release-source/source/kagent/helm/kagent/templates/substrate-ate-api-rbac.yaml
+        cp /workspace/deploy/helm/Chart.preview.yaml \
+          /workspace/release-source/source/kagent/helm/kagent/Chart.yaml
+        cp /workspace/locks/kagent-preview.lock.json \
+          /workspace/release-source/locks/kagent-preview.lock.json
+        grep -Fq "image: $${IMAGE_REPOSITORY}" \
+          /workspace/release-source/deploy/skaffold.preview.yaml
+        grep -Fq "image: $${UI_IMAGE_REPOSITORY}" \
+          /workspace/release-source/deploy/skaffold.preview.yaml
+        grep -Fq "image: $${VERIFY_IMAGE}" \
+          /workspace/release-source/deploy/skaffold.preview.yaml
+        grep -Fq "appVersion: $${SOURCE_COMMIT}" \
+          /workspace/release-source/source/kagent/helm/kagent/Chart.yaml
+        if grep -Eq '^dependencies:' \
+          /workspace/release-source/source/kagent/helm/kagent/Chart.yaml; then
+          echo "controller-delta preview chart must not include subcharts" >&2
+          exit 1
+        fi
+        if find /workspace/release-source/source/kagent/helm/kagent/templates \
+          -path '*/rbac/*' -o -name 'substrate-ate-api-rbac.yaml' | grep -q .; then
+          echo "product assembly still contains Terraform-owned RBAC templates" >&2
+          exit 1
+        fi
+        helm lint /workspace/release-source/source/kagent/helm/kagent \
+          -f /workspace/release-source/deploy/helm/values.preview.yaml
+        helm template kagent-preview \
+          /workspace/release-source/source/kagent/helm/kagent \
+          --namespace kagent-system \
+          -f /workspace/release-source/deploy/helm/values.preview.yaml \
+          > /workspace/evidence/rendered-preview.yaml
+
+        mkdir -p /workspace/crd-bootstrap-chart
+        cp -R /workspace/source/kagent/helm/kagent-crds/. \
+          /workspace/crd-bootstrap-chart/
+        cp /workspace/deploy/bootstrap-crds/Chart.preview.yaml \
+          /workspace/crd-bootstrap-chart/Chart.yaml
+        grep -Fq "appVersion: $${SOURCE_COMMIT}" \
+          /workspace/crd-bootstrap-chart/Chart.yaml
+        if grep -Eq '^dependencies:' /workspace/crd-bootstrap-chart/Chart.yaml; then
+          echo "kagent-only CRD bundle must not include chart dependencies" >&2
+          exit 1
+        fi
+        helm lint /workspace/crd-bootstrap-chart \
+          -f /workspace/deploy/bootstrap-crds/values.preview.yaml
+        helm template kagent-preview-crds /workspace/crd-bootstrap-chart \
+          -f /workspace/deploy/bootstrap-crds/values.preview.yaml \
+          > /workspace/evidence/bootstrap-crds.yaml
+        actual_crd_bundle_sha=$$(sha256sum /workspace/evidence/bootstrap-crds.yaml | awk '{print $$1}')
+        test "$${actual_crd_bundle_sha}" = "$${CRD_BUNDLE_SHA256}" || {
+          echo "rendered CRD bootstrap digest differs from the lock" >&2
+          exit 1
+        }
+        printf '%s\n' "$${actual_crd_bundle_sha}" \
+          > /workspace/evidence/bootstrap-crds.sha256
+
+  - id: validate-rendered-assembly
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        python3 scripts/assert-rendered-preview.py \
+          /workspace/evidence/rendered-preview.yaml \
+          --controller-image "$${IMAGE_REPOSITORY}:$${IMAGE_TAG}" \
+          --ui-image "$${UI_IMAGE_REPOSITORY}:$${UI_IMAGE_TAG}" \
+          --database-image "$${DATABASE_IMAGE}"
+        python3 scripts/assert-crd-bundle.py \
+          /workspace/evidence/bootstrap-crds.yaml --expected-count 10
+
+  - id: build-controller-and-ui-with-attestations
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    env:
+      - BUILD_RUN_ID=$BUILD_ID
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        builder="kagent-preview-$${BUILD_RUN_ID}"
+        cleanup() { docker buildx rm "$${builder}" >/dev/null 2>&1 || true; }
+        trap cleanup EXIT
+        docker buildx version > /workspace/evidence/buildx-version.txt
+        cat /workspace/evidence/buildx-version.txt
+        printf '%s\n' "$${BUILDKIT_IMAGE}" \
+          > /workspace/evidence/buildkit-driver-image.txt
+        docker buildx create --name "$${builder}" --driver docker-container \
+          --driver-opt "image=$${BUILDKIT_IMAGE}" --use
+        docker buildx inspect --bootstrap \
+          | tee /workspace/evidence/buildx-inspect.txt
+        grep -Eq 'Buildkit:[[:space:]]+v?0\.23\.0' \
+          /workspace/evidence/buildx-inspect.txt || {
+          echo "pinned BuildKit v0.23.0 did not start" >&2
+          exit 1
+        }
+        build_date=$$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+        ldflags="-X github.com/kagent-dev/kagent/go/core/internal/version.Version=$${IMAGE_TAG} -X github.com/kagent-dev/kagent/go/core/internal/version.GitCommit=$${SOURCE_COMMIT} -X github.com/kagent-dev/kagent/go/core/internal/version.BuildDate=$${build_date}"
+        docker buildx build \
+          --platform "$${BUILD_PLATFORM}" \
+          --build-arg "BUILD_PACKAGE=$${BUILD_PACKAGE}" \
+          --build-arg "VERSION=$${IMAGE_TAG}" \
+          --build-arg "LDFLAGS=$${ldflags}" \
+          --attest type=sbom \
+          --attest type=provenance,mode=max \
+          --metadata-file /workspace/evidence/controller-build-metadata.json \
+          --push \
+          --tag "$${IMAGE_REPOSITORY}:$${IMAGE_TAG}" \
+          --file "/workspace/source/kagent/$${DOCKERFILE}" \
+          /workspace/source/kagent/go
+        docker buildx build \
+          --platform "$${BUILD_PLATFORM}" \
+          --build-arg "VERSION=$${UI_IMAGE_TAG}" \
+          --attest type=sbom \
+          --attest type=provenance,mode=max \
+          --metadata-file /workspace/evidence/ui-build-metadata.json \
+          --push \
+          --tag "$${UI_IMAGE_REPOSITORY}:$${UI_IMAGE_TAG}" \
+          --file "/workspace/source/kagent/$${UI_DOCKERFILE}" \
+          "/workspace/source/kagent/$${UI_SOURCE_PATH}"
+
+  - id: resolve-registry-digest
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        gcloud artifacts docker images describe \
+          "$${IMAGE_REPOSITORY}:$${IMAGE_TAG}" \
+          --project "$_PROJECT_ID" \
+          --format json > /workspace/evidence/controller-image-describe.json
+        controller_digest=$$(gcloud artifacts docker images describe \
+          "$${IMAGE_REPOSITORY}:$${IMAGE_TAG}" \
+          --project "$_PROJECT_ID" \
+          --format 'value(image_summary.digest)')
+        printf '%s\n' "$${controller_digest}" | grep -Eq '^sha256:[0-9a-f]{64}$' || {
+          echo "registry did not return an immutable controller digest" >&2
+          exit 1
+        }
+        built_controller_digest=$$(python3 scripts/build-metadata-digest.py \
+          /workspace/evidence/controller-build-metadata.json)
+        test "$${controller_digest}" = "$${built_controller_digest}" || {
+          echo "controller tag was replaced between build and registry resolution" >&2
+          exit 1
+        }
+
+        gcloud artifacts docker images describe \
+          "$${UI_IMAGE_REPOSITORY}:$${UI_IMAGE_TAG}" \
+          --project "$_PROJECT_ID" \
+          --format json > /workspace/evidence/ui-image-describe.json
+        ui_digest=$$(gcloud artifacts docker images describe \
+          "$${UI_IMAGE_REPOSITORY}:$${UI_IMAGE_TAG}" \
+          --project "$_PROJECT_ID" \
+          --format 'value(image_summary.digest)')
+        printf '%s\n' "$${ui_digest}" | grep -Eq '^sha256:[0-9a-f]{64}$' || {
+          echo "registry did not return an immutable UI digest" >&2
+          exit 1
+        }
+        built_ui_digest=$$(python3 scripts/build-metadata-digest.py \
+          /workspace/evidence/ui-build-metadata.json)
+        test "$${ui_digest}" = "$${built_ui_digest}" || {
+          echo "UI tag was replaced between build and registry resolution" >&2
+          exit 1
+        }
+
+        immutable_controller_image="$${IMAGE_REPOSITORY}@$${controller_digest}"
+        immutable_ui_image="$${UI_IMAGE_REPOSITORY}@$${ui_digest}"
+        {
+          printf 'CONTROLLER_IMAGE_DIGEST=%q\n' "$${controller_digest}"
+          printf 'IMMUTABLE_CONTROLLER_IMAGE=%q\n' "$${immutable_controller_image}"
+          printf 'UI_IMAGE_DIGEST=%q\n' "$${ui_digest}"
+          printf 'IMMUTABLE_UI_IMAGE=%q\n' "$${immutable_ui_image}"
+        } > /workspace/evidence/image.env
+        {
+          printf 'controller=%s\n' "$${immutable_controller_image}"
+          printf 'ui=%s\n' "$${immutable_ui_image}"
+        } > /workspace/evidence/images.txt
+        python3 scripts/freeze-rendered-image.py \
+          /workspace/evidence/rendered-preview.yaml \
+          /workspace/evidence/rendered-preview-controller-digest.yaml \
+          --tagged-image "$${IMAGE_REPOSITORY}:$${IMAGE_TAG}" \
+          --immutable-image "$${immutable_controller_image}"
+        python3 scripts/freeze-rendered-image.py \
+          /workspace/evidence/rendered-preview-controller-digest.yaml \
+          /workspace/evidence/rendered-preview-digest.yaml \
+          --tagged-image "$${UI_IMAGE_REPOSITORY}:$${UI_IMAGE_TAG}" \
+          --immutable-image "$${immutable_ui_image}"
+        python3 scripts/assert-rendered-preview.py \
+          /workspace/evidence/rendered-preview-digest.yaml \
+          --controller-image "$${immutable_controller_image}" \
+          --ui-image "$${immutable_ui_image}" \
+          --database-image "$${DATABASE_IMAGE}"
+
+  - id: sbom-and-vulnerability-scan
+    name: $_TRIVY_IMAGE
+    entrypoint: sh
+    env:
+      - DOCKER_CONFIG=/builder/home/.docker
+    args:
+      - -ceu
+      - |
+        . /workspace/evidence/image.env
+        trivy image --timeout 20m --cache-dir /workspace/.trivy-cache \
+          --format spdx-json --output /workspace/evidence/controller-sbom.spdx.json \
+          "$${IMMUTABLE_CONTROLLER_IMAGE}"
+        trivy image --timeout 20m --cache-dir /workspace/.trivy-cache \
+          --scanners vuln --severity HIGH,CRITICAL --exit-code 0 \
+          --format json --output /workspace/evidence/controller-trivy-high-critical.json \
+          "$${IMMUTABLE_CONTROLLER_IMAGE}"
+        trivy image --timeout 20m --cache-dir /workspace/.trivy-cache \
+          --format spdx-json --output /workspace/evidence/ui-sbom.spdx.json \
+          "$${IMMUTABLE_UI_IMAGE}"
+        trivy image --timeout 20m --cache-dir /workspace/.trivy-cache \
+          --scanners vuln --severity HIGH,CRITICAL --exit-code 0 \
+          --format json --output /workspace/evidence/ui-trivy-high-critical.json \
+          "$${IMMUTABLE_UI_IMAGE}"
+
+  - id: summarize-scan
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        python3 scripts/assert-trivy-report.py \
+          /workspace/evidence/controller-trivy-high-critical.json \
+          --summary /workspace/evidence/controller-trivy-high-critical.txt \
+          --allow-findings
+        python3 scripts/assert-trivy-report.py \
+          /workspace/evidence/ui-trivy-high-critical.json \
+          --summary /workspace/evidence/ui-trivy-high-critical.txt \
+          --allow-findings
+
+  # Evidence is persisted before the blocking decision, so a rejected image
+  # still has an auditable SBOM and vulnerability report.
+  - id: store-pre-release-evidence
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    env:
+      - BUILD_RUN_ID=$BUILD_ID
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        destination="gs://$_EVIDENCE_BUCKET/$${EVIDENCE_PREFIX}/$${PRODUCT_TAG}/$${BUILD_RUN_ID}"
+        gcloud storage cp --recursive /workspace/evidence "$${destination}/"
+        printf '%s\n' "$${destination}" > /workspace/evidence/evidence-uri.txt
+
+  - id: block-high-critical
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        python3 scripts/assert-trivy-report.py \
+          /workspace/evidence/controller-trivy-high-critical.json
+        python3 scripts/assert-trivy-report.py \
+          /workspace/evidence/ui-trivy-high-critical.json
+
+  - id: verify-crd-bootstrap-prerequisite
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        test "$_CRDS_READY" = "true" || {
+          echo "current kagent CRDs are not yet marked ready by platform-admin" >&2
+          echo "apply and verify evidence/bootstrap-crds.yaml, then flip the Terraform gate" >&2
+          exit 1
+        }
+        test "$_CRD_BUNDLE_SHA256" = "$${CRD_BUNDLE_SHA256}" || {
+          echo "platform CRD bundle digest differs from the reviewed lock" >&2
+          exit 1
+        }
+        actual=$$(sha256sum /workspace/evidence/bootstrap-crds.yaml | awk '{print $$1}')
+        test "$${actual}" = "$${CRD_BUNDLE_SHA256}" || {
+          echo "local CRD evidence changed after rendering" >&2
+          exit 1
+        }
+
+  - id: create-cloud-deploy-release
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        source /workspace/evidence/image.env
+        if gcloud deploy releases describe "$${RELEASE_NAME}" \
+          --delivery-pipeline "$_DELIVERY_PIPELINE" \
+          --region "$_REGION" --project "$_PROJECT_ID" >/dev/null 2>&1; then
+          echo "release $${RELEASE_NAME} already exists; refusing to overwrite it" >&2
+          exit 1
+        fi
+        gcloud deploy releases create "$${RELEASE_NAME}" \
+          --delivery-pipeline "$_DELIVERY_PIPELINE" \
+          --to-target "$_INITIAL_TARGET" \
+          --region "$_REGION" \
+          --project "$_PROJECT_ID" \
+          --source /workspace/release-source \
+          --skaffold-file deploy/skaffold.preview.yaml \
+          --images "$${IMAGE_REPOSITORY}=$${IMMUTABLE_CONTROLLER_IMAGE},$${UI_IMAGE_REPOSITORY}=$${IMMUTABLE_UI_IMAGE}" \
+          --gcs-source-staging-dir "gs://$_EVIDENCE_BUCKET/source" \
+          --labels "channel=preview" \
+          --annotations "kagent-source-commit=$${SOURCE_COMMIT},controller-digest=$${CONTROLLER_IMAGE_DIGEST},ui-digest=$${UI_IMAGE_DIGEST},product-tag=$${PRODUCT_TAG},product-commit=$${PRODUCT_COMMIT}" \
+          --format json > /workspace/evidence/cloud-deploy-release.json
+
+  - id: store-release-receipt
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    env:
+      - BUILD_RUN_ID=$BUILD_ID
+    args:
+      - -ceu
+      - |
+        source /workspace/evidence/preview.env
+        destination="gs://$_EVIDENCE_BUCKET/$${EVIDENCE_PREFIX}/$${PRODUCT_TAG}/$${BUILD_RUN_ID}"
+        gcloud storage cp \
+          /workspace/evidence/cloud-deploy-release.json \
+          /workspace/evidence/evidence-uri.txt \
+          "$${destination}/evidence/"

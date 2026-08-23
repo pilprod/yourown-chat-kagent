@@ -50,9 +50,14 @@ idempotency или reconciliation. В таком случае правильны
    конфигурацию.
 2. Регрессионный тест в fork воспроизводит конкретный дефект и сопровождает
    минимальное исправление, сначала предлагаемое в upstream.
-3. Общий testbed проверяет настоящий поток AgentInstance/A2A вместе с
+3. Controller-only delta preview lane собирает controller и неизменённый UI
+   companion из exact source commit, блокирует API, CRD, migration, runtime и
+   UI source drift, сохраняет SBOM/provenance и допускает в testbed только оба
+   digest без HIGH/CRITICAL находок.
+4. Общий testbed проверяет настоящий поток AgentInstance/A2A вместе с
    Temporal-адаптером, доверенной identity и сетевой границей Tool Gateway.
-4. Только после успешной проверки совместимости отдельно проектируется
-   квалификация релиза.
+5. Только после успешной проверки совместимости отдельно проектируется stable
+   qualification; preview не получает production promotion автоматически.
 
-На этом этапе ни один удалённый testbed-прогон не заявлен как выполненный.
+На этом этапе ни один удалённый testbed-прогон и ни один preview release не
+заявлен как выполненный.
