@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "k8s-agents-platform/kagent-source-lock/v1alpha1",
+  "classification": "evaluation-only",
+  "source": {
+    "forkRepository": "https://github.com/pilprod/kagent",
+    "upstreamRepository": "https://github.com/kagent-dev/kagent",
+    "forkCommit": "5229184e280a6f3bf205b4e64405a92d1fbc259f",
+    "upstreamCommit": "5229184e280a6f3bf205b4e64405a92d1fbc259f"
+  },
+  "provenance": {
+    "upstreamCommitURL": "https://github.com/kagent-dev/kagent/commit/5229184e280a6f3bf205b4e64405a92d1fbc259f",
+    "tree": "8feb3dd0296ce5f96cf5b899c8cc92ea4057d5b5",
+    "parent": "cb869a0e3532550c5fe5f7bbaf00a6408cb9ab3b",
+    "embeddedSignature": "pgp",
+    "verificationProvider": "github"
+  },
+  "artifacts": {
+    "controllerImage": null,
+    "runtimeImage": null,
+    "applicationChart": null,
+    "crdChart": null
+  },
+  "release": {
+    "owner": null,
+    "forkTagsRelease": false,
+    "productionEligible": false
+  }
+}
