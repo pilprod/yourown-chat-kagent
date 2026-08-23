@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "yourown-chat/kagent-testbed-lock/v1alpha1",
+  "channel": "testbed",
+  "candidateTag": "testbed-20260823-1",
+  "productionEligible": false,
+  "source": {
+    "repository": "https://github.com/kagent-dev/kagent",
+    "tag": "v0.9.12",
+    "commit": "b45990582595acea5f6e765b86a10b251c50d5c9"
+  },
+  "charts": {
+    "repository": "oci://ghcr.io/kagent-dev/kagent/helm",
+    "version": "0.9.12",
+    "application": {
+      "ociDigest": "sha256:ec0dacc1a76edbd190a554757c8bdb193ccb0b35deeb35f6d7a7e7ffc76d99fd",
+      "archiveSHA256": "a6aede4fd39aab4ea0292b68a59ed2b0e41afc50f1e8de8a9a2ead2a89bd5075"
+    },
+    "crds": {
+      "ociDigest": "sha256:85174e69eab19e05fcf82dbfda86e8e84c2be97a52c645d60cf1ae51ccbca977",
+      "archiveSHA256": "977e59c4ad7f751f2badea53d5f698220f37a1af28fb282fd7917103a084e7f3"
+    }
+  },
+  "profile": {
+    "applicationValuesSHA256": "de2e5f3fc6e6bdc7f1f93eb2a6453213ff800187071267514606f6bdd595fce2",
+    "crdValuesSHA256": "753d6253816b5701b653c42311811a2f2399b61e7ae14ad338491c03eb4729cf",
+    "namespace": "kagent-system",
+    "workloadNamespace": "kagent-testbed",
+    "uiHostname": "kagent.yourown.chat",
+    "uiService": "http://kagent-ui.kagent-system.svc.cluster.local:8080"
+  },
+  "features": {
+    "ui": true,
+    "kmcp": false,
+    "substrate": false,
+    "defaultAgents": false,
+    "realModelProvider": false,
+    "externalAgentHost": false,
+    "temporal": false
+  }
+}
